@@ -61,6 +61,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"convert-hex@npm:~0.1.0":
+  version: 0.1.0
+  resolution: "convert-hex@npm:0.1.0"
+  checksum: 80b5c3f4db67b9fcad6c7539997117c5ee41f8142bc82bddda5da0d699dbed33ab8c1e86a075867468766702330cac4c559930ae371c953e4ae46118f3578d06
+  languageName: node
+  linkType: hard
+
+"convert-string@npm:~0.1.0":
+  version: 0.1.0
+  resolution: "convert-string@npm:0.1.0"
+  checksum: eb737865fbb216cb823e465d819452c2c5a60cc0ad9da9bd9d699ba8178c4ff6186501f75af43c420bbe25e5ccac7f27ff1011640ab77e0227f6b992bfb043bd
+  languageName: node
+  linkType: hard
+
 "define-data-property@npm:^1.0.1, define-data-property@npm:^1.1.1":
   version: 1.1.1
   resolution: "define-data-property@npm:1.1.1"
@@ -230,6 +244,7 @@ __metadata:
     acorn: "npm:^8.11.2"
     acorn-walk: "npm:^8.3.1"
     recast: "npm:^0.23.4"
+    sha256: "npm:^0.2.0"
     typescript: "npm:^5.3.3"
     uglify-js: "npm:^3.17.4"
   languageName: unknown
@@ -286,6 +301,16 @@ __metadata:
     gopd: "npm:^1.0.1"
     has-property-descriptors: "npm:^1.0.0"
   checksum: a29e255c116c29e3323b851c4f46c58c91be9bb8b065f191e2ea1807cb2c839df56e3175732a498e0c6d54626ba6b6fef896bf699feb7ab70c42dc47eb247c95
+  languageName: node
+  linkType: hard
+
+"sha256@npm:^0.2.0":
+  version: 0.2.0
+  resolution: "sha256@npm:0.2.0"
+  dependencies:
+    convert-hex: "npm:~0.1.0"
+    convert-string: "npm:~0.1.0"
+  checksum: 4ba9822cb88138b8416c1a428779e7aebeae3e317cb428d99cb254e6f841869fb8f868cf2ba965e1a7070ce5bbeccb625947caa983a0df7355cad8f014e35060
   languageName: node
   linkType: hard
 
