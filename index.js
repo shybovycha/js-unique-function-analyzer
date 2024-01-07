@@ -96,18 +96,18 @@ const processFunctions = (functions, outputFilename, sourceFilename = undefined)
     const uniqueFunctions = groupBy(functions, 'hash');
 
     const analysis = Object.entries(uniqueFunctions)
-        .map(([hash, duplicates]) => ({
+        .map(([hash, occurrences]) => ({
             hash,
-            code: duplicates[0].code,
-            duplicates: duplicates.length,
-            length: sum(duplicates.sort((a, b) => a.length - b.length).slice(1).map(({ length }) => length)) // leave the shortest version aside and count the duplicate chars for the rest
+            code: occurrences[0].code,
+            duplicates: occurrences.length - 1,
+            length: sum(occurrences.sort((a, b) => a.length - b.length).slice(1).map(({ length }) => length)) // leave the shortest version aside and count the duplicate chars for the rest
         }))
+        .filter(({ duplicates }) => duplicates > 0)
         .sort((a, b) => b.duplicates - a.duplicates);
 
     const duplicateLength = sum(Object.values(analysis).map(({ length }) => length));
 
-    console.log(`Found ${functions.length} functions`);
-    console.log(`${Object.keys(uniqueFunctions).length} are unique (${Math.round((Object.keys(uniqueFunctions).length / functions.length) * 10000.0) / 100}%)`);
+    console.log(`Found ${functions.length} functions, ${Object.keys(uniqueFunctions).length} are unique (${Math.round((Object.keys(uniqueFunctions).length / functions.length) * 10000.0) / 100}%)`);
 
     if (!!sourceFilename) {
         const code = fs.readFileSync(sourceFilename).toString();
