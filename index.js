@@ -1,4 +1,4 @@
-const { getFunctionDefinitionsOverThreshold } = require('./src/utils');
+const { simplifyFunction } = require('./src/utils');
 const { analyzeFunctions } = require('./src/analysis');
 const { replaceDuplicateDefinitions } = require('./src/optimizations');
 
@@ -35,17 +35,11 @@ if (command === 'analyze') {
 
     if (duplicateThresholdArgIdx > -1) {
         const duplicateThreshold = parseInt(process.argv[duplicateThresholdArgIdx + 1]);
-        const uniqFunctionsHashes = getFunctionDefinitionsOverThreshold({
-            sourceFilename,
-            threshold: duplicateThreshold,
-        });
-
-        console.log(`Functions with over ${duplicateThreshold} occurrences, to be replaced:`, uniqFunctionsHashes);
 
         replaceDuplicateDefinitions({
             outputFilename,
             sourceFilename,
-            hashes: uniqFunctionsHashes,
+            threshold: duplicateThreshold,
             verboseOutput,
         });
     } else if (hashesArgIdx > -1) {

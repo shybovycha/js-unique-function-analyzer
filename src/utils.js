@@ -198,10 +198,76 @@ const getFunctionDefinitionsOverThreshold = ({
         .map(([ hash, _ ]) => hash);
 };
 
+const simplifyFunction = (code, fname) => {
+    const tmpFilename = '_tmp';
+
+    fs.writeFileSync(tmpFilename, code, 'utf-8');
+
+    const root = ts.createSourceFile(
+        tmpFilename,
+        code,
+        ts.ScriptTarget.ESNext,
+        /* setParentNodes */ true
+    );
+
+    let rootFnName = undefined;
+
+    const parse1 = (node) => {
+        if (ts.isFunctionDeclaration(node) && ts.isIdentifier(node.name) && node.name.escapedText !== '') {
+            rootFnName = node.name.escapedText;
+            return;
+        }
+
+        ts.forEachChild(node, child => {
+            if (child) {
+                parse1(child);
+            }
+        });
+    };
+
+    parse1(root);
+
+    console.log('rootFnName', rootFnName);
+
+    if (!rootFnName) {
+        fs.rmSync(tmpFilename);
+        return code;
+    }
+
+    const transformer = (ctx) => (sourceFile) => {
+        const visit = (node) => {
+            if (ts.isIdentifier(node) && node.escapedText === rootFnName) {
+                return ts.factory.createIdentifier(fname);
+            }
+
+            return ts.visitEachChild(node, visit, ctx);
+        };
+
+        return ts.visitNode(sourceFile, visit);
+    };
+
+    const s = ts.createSourceFile(tmpFilename, code, ts.ScriptTarget.ESNext);
+    const { transformed } = ts.transform(s, [ transformer ]);
+
+    const newCode = ts.createPrinter().printFile(transformed.find(({ fileName }) => fileName === tmpFilename));
+
+    const minifyOptions = {
+        expression: true,
+        keep_fnames: true,
+    };
+
+    const minCode = uglify.minify(newCode, minifyOptions);
+
+    fs.rmSync(tmpFilename);
+
+    return minCode.code || newCode;
+};
+
 module.exports = {
     readSource,
     getFunctionDefinitionsOverThreshold,
     getFunctionDefinitions,
     getFunctionUsages,
     generateUniqFunctionName,
+    simplifyFunction,
 };

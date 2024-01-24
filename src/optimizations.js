@@ -5,12 +5,19 @@ const path = require('path');
 const sha256 = require('sha256');
 const { groupBy } = require('lodash');
 
-const { readSource, generateUniqFunctionName, getFunctionDefinitions, getFunctionUsages } = require('./utils');
+const {
+    readSource,
+    generateUniqFunctionName,
+    getFunctionDefinitions,
+    getFunctionUsages,
+    simplifyFunction,
+} = require('./utils');
 
 module.exports.replaceDuplicateDefinitions = ({
     sourceFilename,
     outputFilename,
     hashes: uniqFunctionsHashes,
+    threshold: duplicateThreshold,
     verboseOutput,
 }) => {
     console.log('Stage 1 - remove duplicate declarations');
@@ -18,6 +25,16 @@ module.exports.replaceDuplicateDefinitions = ({
     const originalCode = readSource(sourceFilename);
 
     const { functions, varNames } = getFunctionDefinitions(originalCode, sourceFilename);
+
+    if (!uniqFunctionsHashes && duplicateThreshold) {
+        const uniqueFunctions = groupBy(functions, 'hash');
+
+        uniqFunctionsHashes = Object.entries(uniqueFunctions)
+            .filter(([ _, occurrences ]) => occurrences.length - 1 >= duplicateThreshold)
+            .map(([ hash, _ ]) => hash);
+
+        console.log(`Functions with over ${duplicateThreshold} occurrences, to be replaced:`, uniqFunctionsHashes);
+    }
 
     const nameMapping = {};
     const uniqFunctionsCode = [];
@@ -38,7 +55,16 @@ module.exports.replaceDuplicateDefinitions = ({
             console.debug('Building a unique declaration for', uniqName, 'as', func.code);
         }
 
-        const declaration = `${uniqName}=${func.code}`;
+        const minFuncCode = func.code;
+
+        // TODO: fix up $z=function n(){return Object.assign,n.apply(this,arguments)} => $z=function n(){return $z=Object.assign,$z.apply(this,arguments)}
+        // const minFuncCode = simplifyFunction(func.code, uniqName);
+
+        // if (verboseOutput) {
+        //     console.debug('> Simplifying function', func.code, 'to', minFuncCode);
+        // }
+
+        const declaration = `${uniqName}=${minFuncCode}`;
         uniqFunctionsCode.push(declaration);
 
         if (func.name) {
