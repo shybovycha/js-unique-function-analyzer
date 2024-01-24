@@ -153,6 +153,14 @@ const generateUniqFunctionName = (varNames) => {
     return name;
 };
 
+const getFunctionsOverThreshold = (functions, _varNames, threshold) => {
+    const uniqueFunctions = groupBy(functions, 'hash');
+
+    return Object.entries(uniqueFunctions)
+        .filter(([ _, occurrences ]) => occurrences.length - 1 >= threshold)
+        .map(([ hash, _ ]) => hash);
+};
+
 const uniqFunctions = (outputFilename, code, functions, uniqFunctionsHashes, varNames) => {
     const nameMapping = {};
     const uniqFunctionsCode = [];
@@ -203,14 +211,25 @@ const uniqFunctions = (outputFilename, code, functions, uniqFunctionsHashes, var
 const sourceFilename = process.argv[2];
 const outputFilename = process.argv[3] || 'output.json';
 const uniqFunctionsArgIdx = process.argv.findIndex(a => a === '--uniq');
+const duplicateThresholdArgIdx = process.argv.findIndex(a => a === '--threshold');
+
+const duplicateThreshold = duplicateThresholdArgIdx > -1 ? parseInt(process.argv[duplicateThresholdArgIdx + 1]) : 50;
 
 // TODO: make this an interactive multi-pass process with user prompt for confirmation on what to replace next?
 const code = readSource(sourceFilename);
 
 const { functions, varNames } = parseFile(code, sourceFilename);
 
-if (uniqFunctionsArgIdx == -1) {
+if (uniqFunctionsArgIdx == -1 && duplicateThresholdArgIdx == -1) {
     processFunctions(functions, outputFilename, sourceFilename);
+} else if (duplicateThresholdArgIdx > -1) {
+    const uniqFunctionsHashes = getFunctionsOverThreshold(functions, varNames, duplicateThreshold);
+
+    console.log(`Functions with over ${duplicateThreshold} occurrences, to be replaced:`, uniqFunctionsHashes);
+
+    const uniqCodeFilename = path.parse(sourceFilename).name + '.uniq' + path.extname(sourceFilename);
+
+    uniqFunctions(uniqCodeFilename, code, functions, uniqFunctionsHashes, varNames);
 } else {
     const uniqFunctionsHashes = process.argv[uniqFunctionsArgIdx + 1].trim().split(',');
 
@@ -218,5 +237,5 @@ if (uniqFunctionsArgIdx == -1) {
 
     const uniqCodeFilename = path.parse(sourceFilename).name + '.uniq' + path.extname(sourceFilename);
 
-    uniqFunctions(uniqCodeFilename, code, functions, uniqFunctionsHashes, varNames);
+    uniqFunctions(uniqCodeFilename, code, functions, uniqFunctionsHashes, varNames, duplicateThreshold);
 }
