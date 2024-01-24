@@ -5,7 +5,7 @@ const path = require('path');
 const sha256 = require('sha256');
 const { groupBy } = require('lodash');
 
-const { readSource, generateUniqFunctionName, getFunctionDefinitions } = require('./utils');
+const { readSource, generateUniqFunctionName, getFunctionDefinitions, getFunctionUsages } = require('./utils');
 
 module.exports.replaceDuplicateDefinitions = ({
     sourceFilename,
@@ -13,6 +13,8 @@ module.exports.replaceDuplicateDefinitions = ({
     hashes: uniqFunctionsHashes,
     verboseOutput,
 }) => {
+    console.log('Stage 1 - remove duplicate declarations');
+
     const originalCode = readSource(sourceFilename);
 
     const { functions, varNames } = getFunctionDefinitions(originalCode, sourceFilename);
@@ -20,6 +22,7 @@ module.exports.replaceDuplicateDefinitions = ({
     const nameMapping = {};
     const uniqFunctionsCode = [];
     const oldMapping = {};
+    const allReplacements = {};
 
     uniqFunctionsHashes.forEach(hash => {
         const func = functions.find(({ hash: h }) => h === hash);
@@ -56,8 +59,10 @@ module.exports.replaceDuplicateDefinitions = ({
     occurrences.reverse();
 
     // TODO: handle overlapping [start, end] ranges
-    const stage1Code = occurrences.reduce((accCode, { hash, pos: [start, end], isDeclaration }) => {
+    const stage1Code = occurrences.reduce((accCode, { hash, name, pos: [start, end], isDeclaration }) => {
         const uniqName = isDeclaration ? '' : nameMapping[hash];
+
+        allReplacements[name] = nameMapping[hash];
 
         const before = accCode.substring(0, start);
         const after = accCode.substring(end);
@@ -75,8 +80,6 @@ module.exports.replaceDuplicateDefinitions = ({
         return before + uniqName + after;
     }, originalCode);
 
-    // const uniqCode = `var ${uniqFunctionsCode.join(',')};${newCode}`;
-
     fs.writeFileSync(outputFilename, stage1Code, 'utf-8');
 
     console.log(`Wrote intermediate code to ${outputFilename}`);
@@ -92,6 +95,8 @@ module.exports.replaceDuplicateDefinitions = ({
 
     const stage2Code = toBeRemoved.reduce((accCode, { name, pos: [start, end], isDeclaration }) => {
         const uniqName = isDeclaration ? '' : oldMapping[name];
+
+        allReplacements[name] = oldMapping[name];
 
         const before = accCode.substring(0, start);
         const after = accCode.substring(end);
@@ -118,7 +123,38 @@ module.exports.replaceDuplicateDefinitions = ({
             return `${oldName}=${newName}`;
         });
 
-    const resultCode = `var ${[...uniqFunctionsCode, ...oldReferences].join(',')};${stage2Code}`;
+    fs.writeFileSync(outputFilename, stage2Code, 'utf-8');
+
+    console.log(`Wrote intermediate code to ${outputFilename}`);
+
+    // stage 3
+    console.log('Stage 3 - replace all function usages');
+
+    const allFunctions = new Set(Object.keys(allReplacements));
+
+    if (verboseOutput) {
+        console.debug('Mappings for this stage:', allReplacements);
+    }
+
+    const { usages } = getFunctionUsages(stage2Code, outputFilename, allFunctions);
+
+    usages.reverse();
+
+    const stage3Code = usages.reduce((accCode, { name, pos: [start, end] }) => {
+        const uniqName = (accCode.charAt(start) === ' ' ? ' ' : '') + allReplacements[name];
+
+        const before = accCode.substring(0, start);
+        const after = accCode.substring(end);
+
+        if (verboseOutput) {
+            console.debug('> Removing the usage of', name, 'in favor of', uniqName);
+            console.debug(`>> original:`, accCode.substring(start, end));
+        }
+
+        return before + uniqName + after;
+    }, stage2Code);
+
+    const resultCode = `var ${[...uniqFunctionsCode, ...oldReferences].join(',')};${stage3Code}`;
 
     fs.writeFileSync(outputFilename, resultCode, 'utf-8');
 

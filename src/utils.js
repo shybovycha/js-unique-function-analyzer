@@ -21,6 +21,7 @@ const getFunctionDefinitions = (code, sourceFilename) => {
     );
 
     const functions = [];
+    const constructors = new Set();
     const varNames = new Set();
 
     const minifyOptions = {
@@ -28,6 +29,12 @@ const getFunctionDefinitions = (code, sourceFilename) => {
     };
 
     const parse = (node) => {
+        if (ts.isPropertyAccessExpression(node)) {
+            if (node.name.escapedText === 'prototype') {
+                constructors.add(node.expression.escapedText);
+            }
+        }
+
         if (ts.isFunctionExpression(node)) {
             node.parameters.forEach(({ name: parameterName }) => {
                 if (ts.isIdentifier(parameterName)) {
@@ -90,7 +97,59 @@ const getFunctionDefinitions = (code, sourceFilename) => {
 
     parse(root);
 
-    return { functions, varNames };
+    const fns2 = functions.filter(({ name }) => !constructors.has(name));
+
+    console.debug('Found', constructors.size, 'constructors');
+
+    return { functions: fns2, varNames };
+};
+
+const getFunctionUsages = (code, sourceFilename, functionNames) => {
+    console.log(`Parsing file ${sourceFilename}...`);
+
+    const root = ts.createSourceFile(
+        sourceFilename,
+        code,
+        ts.ScriptTarget.ESNext,
+        /* setParentNodes */ true
+    );
+
+    const usages = [];
+
+    const parse = (node) => {
+        if (ts.isBinaryExpression(node) && ts.isIdentifier(node.right) && functionNames.has(node.right.escapedText)) {
+            usages.push({
+                name: node.right.escapedText,
+                pos: [node.right.pos, node.right.end],
+            });
+        }
+
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && functionNames.has(node.expression.escapedText)) {
+            usages.push({
+                name: node.expression.escapedText,
+                pos: [node.expression.pos, node.expression.end],
+            });
+        }
+
+        if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && node.name.escapedText !== 'prototype' && functionNames.has(node.expression.escapedText)) {
+            usages.push({
+                name: node.expression.escapedText,
+                pos: [node.expression.pos, node.expression.end],
+            });
+        }
+
+        ts.forEachChild(node, child => {
+            if (child) {
+                parse(child);
+            }
+        });
+    };
+
+    parse(root);
+
+    console.debug('Found', usages.length, 'usages');
+
+    return { usages };
 };
 
 const generateUniqFunctionName = (varNames) => {
@@ -143,5 +202,6 @@ module.exports = {
     readSource,
     getFunctionDefinitionsOverThreshold,
     getFunctionDefinitions,
+    getFunctionUsages,
     generateUniqFunctionName,
 };
