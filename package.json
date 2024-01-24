@@ -8,6 +8,7 @@
     "uglify-js": "^3.17.4"
   },
   "scripts": {
-    "analyze": "node index.js"
+    "analyze": "node index.js analyze",
+    "optimize": "node index.js optimize"
   }
 }
