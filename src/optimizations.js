@@ -55,14 +55,14 @@ module.exports.replaceDuplicateDefinitions = ({
             console.debug('Building a unique declaration for', uniqName, 'as', func.code);
         }
 
-        const minFuncCode = func.code;
+        // const minFuncCode = func.code;
 
         // TODO: fix up $z=function n(){return Object.assign,n.apply(this,arguments)} => $z=function n(){return $z=Object.assign,$z.apply(this,arguments)}
-        // const minFuncCode = simplifyFunction(func.code, uniqName);
+        const minFuncCode = simplifyFunction(func.code, uniqName);
 
-        // if (verboseOutput) {
-        //     console.debug('> Simplifying function', func.code, 'to', minFuncCode);
-        // }
+        if (verboseOutput) {
+            console.debug('> Simplifying function', func.code, 'to', minFuncCode);
+        }
 
         const declaration = `${uniqName}=${minFuncCode}`;
         uniqFunctionsCode.push(declaration);

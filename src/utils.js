@@ -227,8 +227,6 @@ const simplifyFunction = (code, fname) => {
 
     parse1(root);
 
-    console.log('rootFnName', rootFnName);
-
     if (!rootFnName) {
         fs.rmSync(tmpFilename);
         return code;
@@ -240,6 +238,38 @@ const simplifyFunction = (code, fname) => {
                 return ts.factory.createIdentifier(fname);
             }
 
+            if (
+                ts.isFunctionDeclaration(node) &&
+                ts.isBlock(node.body) &&
+                node.body.statements.length === 1 &&
+                ts.isReturnStatement(node.body.statements[0]) &&
+                ts.isBinaryExpression(node.body.statements[0].expression)
+            ) {
+                const next = ts.factory.createFunctionDeclaration(
+                    [],
+                    undefined,
+                    fname,
+                    [],
+                    [],
+                    undefined,
+
+                    ts.factory.createBlock([
+                        ts.factory.createReturnStatement(
+                            ts.factory.createComma(
+                                ts.factory.createAssignment(
+                                    ts.factory.createIdentifier(fname),
+                                    node.body.statements[0].expression.left
+                                ),
+
+                                node.body.statements[0].expression.right
+                            )
+                        )
+                    ])
+                );
+
+                return ts.visitEachChild(next, visit, ctx);
+            }
+
             return ts.visitEachChild(node, visit, ctx);
         };
 
@@ -249,18 +279,12 @@ const simplifyFunction = (code, fname) => {
     const s = ts.createSourceFile(tmpFilename, code, ts.ScriptTarget.ESNext);
     const { transformed } = ts.transform(s, [ transformer ]);
 
-    const newCode = ts.createPrinter().printFile(transformed.find(({ fileName }) => fileName === tmpFilename));
-
-    const minifyOptions = {
-        expression: true,
-        keep_fnames: true,
-    };
-
-    const minCode = uglify.minify(newCode, minifyOptions);
+    const newCode = ts.createPrinter({ omitTrailingSemicolon: true })
+        .printFile(transformed.find(({ fileName }) => fileName === tmpFilename));
 
     fs.rmSync(tmpFilename);
 
-    return minCode.code || newCode;
+    return newCode;
 };
 
 module.exports = {
