@@ -1,7 +1,16 @@
 const fs = require('fs');
 const { groupBy, sum } = require('lodash');
 
-module.exports.analyzeFunctions = (functions, outputFilename, sourceFilename = undefined) => {
+const { readSource, getFunctionDefinitions } = require('./utils');
+
+module.exports.analyzeFunctions = ({
+    outputFilename,
+    sourceFilename = undefined,
+    verboseOutput,
+}) => {
+    const code = readSource(sourceFilename);
+    const { functions } = getFunctionDefinitions(code, sourceFilename);
+
     console.log('Analyzing code...');
 
     const uniqueFunctions = groupBy(functions, 'hash');
@@ -18,13 +27,14 @@ module.exports.analyzeFunctions = (functions, outputFilename, sourceFilename = u
 
     const duplicateLength = sum(Object.values(analysis).map(({ length }) => length));
 
-    console.log(`Found ${functions.length} functions, ${Object.keys(uniqueFunctions).length} are unique (${Math.round((Object.keys(uniqueFunctions).length / functions.length) * 10000.0) / 100}%)`);
+    if (verboseOutput) {
+        console.debug(`Found ${functions.length} functions, ${Object.keys(uniqueFunctions).length} are unique (${Math.round((Object.keys(uniqueFunctions).length / functions.length) * 10000.0) / 100}%)`);
 
-    if (!!sourceFilename) {
-        const code = fs.readFileSync(sourceFilename).toString();
-        console.log(`Duplicates length: ${duplicateLength} bytes out of ${code.length} bytes are duplicate code (${Math.round((duplicateLength / code.length) * 10000.0) / 100}%)`);
-    } else {
-        console.log(`Duplicates length: ${duplicateLength} bytes`);
+        if (!!sourceFilename) {
+            console.debug(`Duplicates length: ${duplicateLength} bytes out of ${code.length} bytes are duplicate code (${Math.round((duplicateLength / code.length) * 10000.0) / 100}%)`);
+        } else {
+            console.debug(`Duplicates length: ${duplicateLength} bytes`);
+        }
     }
 
     fs.writeFileSync(outputFilename, JSON.stringify(analysis, null, '  '), 'utf-8');

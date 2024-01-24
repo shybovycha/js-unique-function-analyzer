@@ -4,13 +4,13 @@ const fs = require('fs');
 const sha256 = require('sha256');
 const { groupBy } = require('lodash');
 
-module.exports.readSource = (sourceFilename) => {
+const readSource = (sourceFilename) => {
     console.log(`Reading code from file ${sourceFilename}...`);
 
     return fs.readFileSync(sourceFilename).toString();
 };
 
-module.exports.getFunctionDefinitions = (code, sourceFilename) => {
+const getFunctionDefinitions = (code, sourceFilename) => {
     console.log(`Parsing file ${sourceFilename}...`);
 
     const root = ts.createSourceFile(
@@ -68,19 +68,23 @@ module.exports.getFunctionDefinitions = (code, sourceFilename) => {
             const body = code.substring(node.pos, node.end);
             const minCode = uglify.minify(body, minifyOptions);
 
-            functions.push({
-                name: node.name && node.name.text,
-                code: minCode.code,
-                pos: [node.pos, node.end],
-                length: node.end - node.pos,
-                hash: sha256(minCode.code),
-                isDeclaration: ts.isFunctionDeclaration(node),
-                // node,
-            });
+            if (minCode.code) {
+                functions.push({
+                    name: node.name && node.name.text,
+                    code: minCode.code,
+                    pos: [node.pos, node.end],
+                    length: node.end - node.pos,
+                    hash: sha256(minCode.code),
+                    isDeclaration: ts.isFunctionDeclaration(node),
+                    // node,
+                });
+            }
         }
 
         ts.forEachChild(node, child => {
-            parse(child);
+            if (child) {
+                parse(child);
+            }
         });
     };
 
@@ -89,7 +93,7 @@ module.exports.getFunctionDefinitions = (code, sourceFilename) => {
     return { functions, varNames };
 };
 
-module.exports.generateUniqFunctionName = (varNames) => {
+const generateUniqFunctionName = (varNames) => {
     const g = function*() {
         const a = 'abcdefghijklmnopqrstuvwxyz$'.split('');
         const b = '0123456789'.split('');
@@ -121,10 +125,23 @@ module.exports.generateUniqFunctionName = (varNames) => {
     return name;
 };
 
-module.exports.getFunctionDefinitionsOverThreshold = (functions, threshold) => {
+const getFunctionDefinitionsOverThreshold = ({
+    sourceFilename,
+    threshold,
+}) => {
+    const code = readSource(sourceFilename);
+    const { functions } = getFunctionDefinitions(code, sourceFilename);
+
     const uniqueFunctions = groupBy(functions, 'hash');
 
     return Object.entries(uniqueFunctions)
         .filter(([ _, occurrences ]) => occurrences.length - 1 >= threshold)
         .map(([ hash, _ ]) => hash);
+};
+
+module.exports = {
+    readSource,
+    getFunctionDefinitionsOverThreshold,
+    getFunctionDefinitions,
+    generateUniqFunctionName,
 };
