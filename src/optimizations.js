@@ -7,13 +7,16 @@ const { groupBy } = require('lodash');
 
 const { readSource, generateUniqFunctionName, getFunctionDefinitions } = require('./utils');
 
-const replaceDuplicateDefinitions1 = ({
-    code,
-    functions,
+module.exports.replaceDuplicateDefinitions = ({
+    sourceFilename,
+    outputFilename,
     hashes: uniqFunctionsHashes,
-    existingVariables: varNames,
     verboseOutput,
 }) => {
+    const originalCode = readSource(sourceFilename);
+
+    const { functions, varNames } = getFunctionDefinitions(originalCode, sourceFilename);
+
     const nameMapping = {};
     const uniqFunctionsCode = [];
     const oldMapping = {};
@@ -53,7 +56,7 @@ const replaceDuplicateDefinitions1 = ({
     occurrences.reverse();
 
     // TODO: handle overlapping [start, end] ranges
-    let newCode = occurrences.reduce((accCode, { hash, pos: [start, end], isDeclaration }) => {
+    const stage1Code = occurrences.reduce((accCode, { hash, pos: [start, end], isDeclaration }) => {
         const uniqName = isDeclaration ? '' : nameMapping[hash];
 
         const before = accCode.substring(0, start);
@@ -70,14 +73,24 @@ const replaceDuplicateDefinitions1 = ({
         }
 
         return before + uniqName + after;
-    }, code);
+    }, originalCode);
 
-    const toBeRemoved = functions
-        .filter(({ name }) => name in oldMapping);
+    // const uniqCode = `var ${uniqFunctionsCode.join(',')};${newCode}`;
+
+    fs.writeFileSync(outputFilename, stage1Code, 'utf-8');
+
+    console.log(`Wrote intermediate code to ${outputFilename}`);
+
+    // stage 2
+    console.log('Stage 2 - remove old named declarations');
+
+    const { functions: functions2 } = getFunctionDefinitions(stage1Code, outputFilename);
+
+    const toBeRemoved = functions2.filter(({ name }) => name in oldMapping);
 
     toBeRemoved.reverse();
 
-    newCode = toBeRemoved.reduce((accCode, { name, pos: [start, end], isDeclaration }) => {
+    const stage2Code = toBeRemoved.reduce((accCode, { name, pos: [start, end], isDeclaration }) => {
         const uniqName = isDeclaration ? '' : oldMapping[name];
 
         const before = accCode.substring(0, start);
@@ -94,10 +107,9 @@ const replaceDuplicateDefinitions1 = ({
         }
 
         return before + uniqName + after;
-    }, newCode);
+    }, stage1Code);
 
     const oldReferences = Object.entries(oldMapping)
-        .filter(([ oldName, newName ]) => !(newName in nameMapping))
         .map(([ oldName, newName ]) => {
             if (verboseOutput) {
                 console.debug('> Adding backwards compatibility declaration for', oldName, 'mapping onto', newName);
@@ -106,52 +118,9 @@ const replaceDuplicateDefinitions1 = ({
             return `${oldName}=${newName}`;
         });
 
-    const uniqCode = `var ${[...uniqFunctionsCode, ...oldReferences].join(',')};${newCode}`;
+    const resultCode = `var ${[...uniqFunctionsCode, ...oldReferences].join(',')};${stage2Code}`;
 
-    return uniqCode;
-};
+    fs.writeFileSync(outputFilename, resultCode, 'utf-8');
 
-module.exports.replaceDuplicateDefinitions = ({
-    sourceFilename,
-    outputFilename,
-    hashes,
-    verboseOutput,
-}) => {
-    const originalCode = readSource(sourceFilename);
-
-    const MAX_ITERATIONS = 1;
-
-    let prevHashses = hashes;
-    let prevFilename = sourceFilename;
-    let prevCode = originalCode;
-    let i = 0;
-
-    while (i < MAX_ITERATIONS) {
-        if (verboseOutput) {
-            console.debug(`Optimization iteration ${i + 1}/${MAX_ITERATIONS}`);
-        }
-
-        const { functions, varNames } = getFunctionDefinitions(prevCode, prevFilename);
-
-        const newCode = replaceDuplicateDefinitions1({
-            code: prevCode,
-            functions,
-            existingVariables: varNames,
-            hashes: prevHashses,
-            verboseOutput,
-        });
-
-        if (newCode.length >= prevCode.length) {
-            break;
-        }
-
-        i++;
-        prevCode = newCode;
-        prevFilename = outputFilename;
-        prevHashses = prevHashses.filter(Boolean);
-
-        fs.writeFileSync(outputFilename, prevCode, 'utf-8');
-    }
-
-    console.log(`Wrote uniq code to ${outputFilename}`);
+    console.log(`Wrote optimized code to ${outputFilename}`);
 };
