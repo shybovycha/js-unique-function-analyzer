@@ -248,7 +248,7 @@ const simplifyFunction = (code, fname) => {
                 const next = ts.factory.createFunctionDeclaration(
                     [],
                     undefined,
-                    fname,
+                    undefined,
                     [],
                     [],
                     undefined,
