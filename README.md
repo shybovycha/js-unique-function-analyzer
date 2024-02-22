@@ -1,10 +1,10 @@
-# Unique functions analyzer
+# Unique functions analyzer and optimizer
 
 ## Overview
 
-This tool lets you see how many _unique_ functions you have in your JS source code and which of them have most duplicates.
+This tool lets you see how much _unique_ functions you have in your JS bundle code and get rid of most of the duplicates.
 
-This comes useful when your modern JS application bundle consists of duplicates at `40%` or more, effectively wasting the client & server resources (on serving the duplicate bytes and parsing the same code on browser).
+This comes useful when your modern JS application bundle consists of duplicates at `20%..40%` or more, effectively wasting the client & server resources (on serving the duplicate bytes and parsing the same code on browser).
 
 ## Usage
 
